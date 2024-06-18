@@ -112,12 +112,17 @@ async function onUpdate(update) {
 }
 async function getUserInfo(chatId) {
   const response = await requestTelegram('getChat', makeReqBody({ chat_id: chatId }));
-  return response.result;
+  if (response.ok) {
+    return response.result;
+  } else {
+    console.error(`Failed to get user info for chat ID ${chatId}:`, response);
+    return null;
+  }
 }
 
 async function onMessage(message) {
   if(message.text === '/start'){
-    let startMsg = "\n欢迎使用聊天机器人"
+    let startMsg = "\n欢迎使用GunZi的聊天机器人🎉🎉🎉\n\n你现在发送的消息GunZi能够收到❗❗\n\n他会尽快回复你❗❗\n\n"
     await setBotCommands()
     return sendMessage({
       chat_id:message.chat.id,
@@ -242,13 +247,12 @@ async function handleGuestMessage(message){
     chat_id:ADMIN_UID,
     from_chat_id:message.chat.id,
     message_id:message.message_id
-  })
-  console.log(JSON.stringify(forwardReq))
+  });
+
   if(forwardReq.ok){
     await nfd.put('msg-map-' + forwardReq.result.message_id, chatId)
     // 只有当新的聊天目标与当前聊天目标不同时，才发送提示按钮
     if (currentChatTarget !== chatId) {
-      currentChatTarget = chatId;  // 更新当前聊天目标
       if (!chatTargetUpdated) { // 检查标志
         const userInfo = await getUserInfo(chatId);
         const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${chatId}`;
@@ -257,6 +261,7 @@ async function handleGuestMessage(message){
           text: `新的聊天目标: ${nickname}`,
           ...generateKeyboard([{ text: `选择${nickname}`, data: `select_${chatId}` }])
         });
+        chatTargetUpdated = true; // 设置标志
       }
     }
   }
@@ -287,7 +292,7 @@ async function onCallbackQuery(callbackQuery) {
     const selectedChatId = data.split('_')[1];
     if (currentChatTarget !== selectedChatId) {
       currentChatTarget = selectedChatId;
-      chatTargetUpdated = true; // 设置标志
+      chatTargetUpdated = false; // 设置标志
       const userInfo = await getUserInfo(selectedChatId);
       const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${selectedChatId}`;
       await sendMessage({
@@ -329,23 +334,26 @@ async function handleBlock(message){
       text:'不能屏蔽自己'
     })
   }
+  const userInfo = await getUserInfo(guestChatId);
+  const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${guestChatId}`;
   await nfd.put('isblocked-' + guestChantId, true)
 
   return sendMessage({
     chat_id: ADMIN_UID,
-    text: `UID:${guestChantId}屏蔽成功`,
+    text: `用户 ${nickname} 已被屏蔽`,
   })
 }
 
 async function handleUnBlock(message){
   let guestChantId = await nfd.get('msg-map-' + message.reply_to_message.message_id,
   { type: "json" })
-
+  const userInfo = await getUserInfo(guestChatId);
+  const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${guestChatId}`;
   await nfd.put('isblocked-' + guestChantId, false)
 
   return sendMessage({
     chat_id: ADMIN_UID,
-    text:`UID:${guestChantId}解除屏蔽成功`,
+    text: `用户 ${nickname} 已解除屏蔽`,
   })
 }
 
@@ -353,10 +361,11 @@ async function checkBlock(message){
   let guestChantId = await nfd.get('msg-map-' + message.reply_to_message.message_id,
   { type: "json" })
   let blocked = await nfd.get('isblocked-' + guestChantId, { type: "json" })
-
+  const userInfo = await getUserInfo(guestChatId);
+  const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${guestChatId}`;
   return sendMessage({
     chat_id: ADMIN_UID,
-    text: `UID:${guestChantId}` + (blocked ? '被屏蔽' : '没有被屏蔽')
+    text: `用户 ${nickname}` + (blocked ? ' 已被屏蔽' : ' 未被屏蔽')
   })
 }
 
