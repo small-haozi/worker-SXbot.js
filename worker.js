@@ -122,7 +122,7 @@ async function getUserInfo(chatId) {
 
 async function onMessage(message) {
   if(message.text === '/start'){
-    let startMsg = "\n欢迎使用GunZi的聊天机器人🎉🎉🎉\n\n你现在发送的消息GunZi能够收到❗❗\n\n他会尽快回复你❗❗\n\n"
+    let startMsg = "\n欢迎使用双向聊天机器人"
     await setBotCommands()
     return sendMessage({
       chat_id:message.chat.id,
