@@ -122,7 +122,7 @@ async function getUserInfo(chatId) {
 
 async function onMessage(message) {
   if(message.text === '/start'){
-    let startMsg = "\n欢迎使用双向聊天机器人"
+    let startMsg = "\n欢迎使用GunZi的聊天机器人🎉🎉🎉\n\n你现在发送的消息GunZi能够收到❗❗\n\n他会尽快回复你❗❗\n\n"
     await setBotCommands()
     return sendMessage({
       chat_id:message.chat.id,
@@ -233,13 +233,13 @@ async function sendDirectMessage(text) {
 }
 
 async function handleGuestMessage(message){
-  let chatId = message.chat.id;
+  let chatId = message.chat.id.toString();
   let isblocked = await nfd.get('isblocked-' + chatId, { type: "json" })
   
   if(isblocked){
     return sendMessage({
       chat_id: chatId,
-      text:'Your are blocked'
+      text:'您已被屏蔽'
     })
   }
 
@@ -263,6 +263,8 @@ async function handleGuestMessage(message){
         });
         chatTargetUpdated = true; // 设置标志
       }
+    } else {
+      chatTargetUpdated = true; // 如果当前聊天目标与消息发送者相同，更新标志
     }
   }
   return handleNotify(message)
