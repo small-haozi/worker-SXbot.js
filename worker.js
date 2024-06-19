@@ -253,6 +253,7 @@ async function handleGuestMessage(message){
     await nfd.put('msg-map-' + forwardReq.result.message_id, chatId)
     // 只有当新的聊天目标与当前聊天目标不同时，才发送提示按钮
     if (currentChatTarget !== chatId) {
+      chatTargetUpdated = false; // 重置标志，因为有新的聊天目标
       if (!chatTargetUpdated) { // 检查标志
         const userInfo = await getUserInfo(chatId);
         const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${chatId}`;
@@ -294,7 +295,7 @@ async function onCallbackQuery(callbackQuery) {
     const selectedChatId = data.split('_')[1];
     if (currentChatTarget !== selectedChatId) {
       currentChatTarget = selectedChatId;
-      chatTargetUpdated = false; // 设置标志
+      chatTargetUpdated = true; // 设置标志
       const userInfo = await getUserInfo(selectedChatId);
       const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${selectedChatId}`;
       await sendMessage({
