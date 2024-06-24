@@ -329,9 +329,9 @@ async function handleNotify(message){
 }
 
 async function handleBlock(message){
-  let guestChantId = await nfd.get('msg-map-' + message.reply_to_message.message_id,
+  let guestChatId = await nfd.get('msg-map-' + message.reply_to_message.message_id,
                                       { type: "json" })
-  if(guestChantId === ADMIN_UID){
+  if(guestChatId === ADMIN_UID){
     return sendMessage({
       chat_id: ADMIN_UID,
       text:'不能屏蔽自己'
@@ -339,7 +339,7 @@ async function handleBlock(message){
   }
   const userInfo = await getUserInfo(guestChatId);
   const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${guestChatId}`;
-  await nfd.put('isblocked-' + guestChantId, true)
+  await nfd.put('isblocked-' + guestChatId, true)
 
   return sendMessage({
     chat_id: ADMIN_UID,
@@ -348,11 +348,11 @@ async function handleBlock(message){
 }
 
 async function handleUnBlock(message){
-  let guestChantId = await nfd.get('msg-map-' + message.reply_to_message.message_id,
+  let guestChatId = await nfd.get('msg-map-' + message.reply_to_message.message_id,
   { type: "json" })
   const userInfo = await getUserInfo(guestChatId);
   const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${guestChatId}`;
-  await nfd.put('isblocked-' + guestChantId, false)
+  await nfd.put('isblocked-' + guestChatId, false)
 
   return sendMessage({
     chat_id: ADMIN_UID,
@@ -361,9 +361,9 @@ async function handleUnBlock(message){
 }
 
 async function checkBlock(message){
-  let guestChantId = await nfd.get('msg-map-' + message.reply_to_message.message_id,
+  let guestChatId = await nfd.get('msg-map-' + message.reply_to_message.message_id,
   { type: "json" })
-  let blocked = await nfd.get('isblocked-' + guestChantId, { type: "json" })
+  let blocked = await nfd.get('isblocked-' + guestChatId, { type: "json" })
   const userInfo = await getUserInfo(guestChatId);
   const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${guestChatId}`;
   return sendMessage({
