@@ -233,7 +233,7 @@ async function onMessage(message) {
   } else if (message.text.startsWith('/fraud') && message.chat.id.toString() === ADMIN_UID) {
     const parts = message.text.split(' ');
     if (parts.length === 2) {
-      const fraudId = parts[1];
+      const fraudId = parts[1].toString(); // 确保 UID 是字符串类型
       localFraudList.push(fraudId); // 添加到本地数组
       await saveFraudList(); // 保存更新后的列表
       return sendMessage({
@@ -249,7 +249,7 @@ async function onMessage(message) {
   } else if (message.text.startsWith('/unfraud') && message.chat.id.toString() === ADMIN_UID) {
     const parts = message.text.split(' ');
     if (parts.length === 2) {
-      const fraudId = parts[1];
+      const fraudId = parts[1].toString(); // 确保 UID 是字符串类型
       const index = localFraudList.indexOf(fraudId);
       if (index > -1) {
         localFraudList.splice(index, 1); // 从本地数组中移除
