@@ -485,7 +485,7 @@ async function handleNotify(message) {
     return sendMessage({
       chat_id: ADMIN_UID,
       parse_mode: 'Markdown', // 使用Markdown格式
-      text: `*请注意对方是骗子*！！，UID${chatId}`
+      text: `*请注意对方是骗子*！！，UID：${chatId}`
     });
   }
   if (enable_notification) {
