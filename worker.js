@@ -501,7 +501,7 @@ async function handleNotify(message) {
 }
 
 async function handleBlock(message) {
-  let guestChatId = await nfd.get('msg_map_' + message.reply_to_message.message_id, { type: "json" });
+  let guestChatId = await nfd.get('msg-map-' + message.reply_to_message.message_id, { type: "json" });
   if (guestChatId === ADMIN_UID) {
     return sendMessage({
       chat_id: ADMIN_UID,
@@ -519,7 +519,7 @@ async function handleBlock(message) {
 }
 
 async function handleUnBlock(message) {
-  let guestChatId = await nfd.get('msg_map_' + message.reply_to_message.message_id, { type: "json" });
+  let guestChatId = await nfd.get('msg-map-' + message.reply_to_message.message_id, { type: "json" });
   const userInfo = await getUserInfo(guestChatId);
   const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${guestChatId}`;
   await nfd.put('is_blocked_' + guestChatId, false);
@@ -531,7 +531,7 @@ async function handleUnBlock(message) {
 }
 
 async function checkBlock(message) {
-  let guestChatId = await nfd.get('msg_map_' + message.reply_to_message.message_id, { type: "json" });
+  let guestChatId = await nfd.get('msg-map-' + message.reply_to_message.message_id, { type: "json" });
   let isBlocked = await nfd.get('is_blocked_' + guestChatId, { type: "json" });
   const userInfo = await getUserInfo(guestChatId);
   const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${guestChatId}`;
