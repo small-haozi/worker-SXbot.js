@@ -341,7 +341,7 @@ async function onMessage(message) {
     } else {
       return sendMessage({
         chat_id: message.chat.id,
-        text: '使用方法: 请回复某条消息并输入 /unblock 来解除屏蔽用户。'
+        text: '使用方法: 请【 回复某条消息并输入 /unblock 】 或 【使用 /unblock 屏蔽序号 】来解除屏蔽用户。\n 屏蔽序号可以通过 /blocklist 获取'
       });
     }
   }
