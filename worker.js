@@ -553,7 +553,7 @@ async function handleUnBlock(message) {
   let guestChatId = await nfd.get('msg-map-' + message.reply_to_message.message_id, { type: "json" });
   const userInfo = await getUserInfo(guestChatId);
   const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${guestChatId}`;
-  await nfd.put('is_blocked_' + guestChatId, false);
+  await nfd.put('isblocked-' + guestChatId, false);
 
   return sendMessage({
     chat_id: ADMIN_UID,
@@ -563,7 +563,7 @@ async function handleUnBlock(message) {
 
 async function checkBlock(message) {
   let guestChatId = await nfd.get('msg-map-' + message.reply_to_message.message_id, { type: "json" });
-  let isBlocked = await nfd.get('is_blocked_' + guestChatId, { type: "json" });
+  let isBlocked = await nfd.get('isblocked-' + guestChatId, { type: "json" });
   const userInfo = await getUserInfo(guestChatId);
   const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${guestChatId}`;
   return sendMessage({
