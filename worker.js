@@ -18,6 +18,10 @@ let chatTargetUpdated = false; // 标志是否更新了聊天目标
 // 在程序启动时加载骗子列表
 loadFraudList();
 
+// 转义
+function escapeMarkdown(text) {
+  return text.replace(/([_*[\]()~`>#+-=|{}.!])/g, '\\$1');
+}
 /**
  * Return url to telegram api, optionally with parameters added
  */
@@ -411,7 +415,8 @@ async function handleGuestMessage(message) {
       chatTargetUpdated = false; // 重置标志，因为有新的聊天目标
       if (!chatTargetUpdated) { // 检查标志
         const userInfo = await getUserInfo(chatId);
-        const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${chatId}`;
+        let nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${chatId}`;
+        nickname = escapeMarkdown(nickname); // 转义 Markdown 特殊符号
         const chatLink = `tg://user?id=${chatId}`; // 生成聊天链接
         let messageText = `新的聊天目标: \n*${nickname}*\nUID: ${chatId}\n[点击不用bot直接私聊](${chatLink})`;
         if (await isFraud(chatId)) {
@@ -419,7 +424,7 @@ async function handleGuestMessage(message) {
         }
         await sendMessage({
           chat_id: ADMIN_UID,
-          parse_mode: 'Markdown', // 使用Markdown格式
+          parse_mode: 'MarkdownV2', // 使用MarkdownV2格式
           text: messageText,
           ...generateKeyboard([{ text: `选择${nickname}`, callback_data: `select_${chatId}` }])
         });
@@ -461,7 +466,8 @@ async function onCallbackQuery(callbackQuery) {
       chatTargetUpdated = true; // 设置标志
       await saveRecentChatTargets(selectedChatId); // 保存最近的聊天目标
       const userInfo = await getUserInfo(selectedChatId);
-      const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${selectedChatId}`;
+      let nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${selectedChatId}`;
+      nickname = escapeMarkdown(nickname); // 转义 Markdown 特殊符号
       const chatLink = `tg://user?id=${selectedChatId}`; // 生成聊天链接
       let messageText = `已切换到聊天目标:【 *${nickname}* 】 \nuid：${selectedChatId}\n[点击不用bot直接私聊](${chatLink})`;
       if (await isFraud(selectedChatId)) {
@@ -470,7 +476,7 @@ async function onCallbackQuery(callbackQuery) {
       // 发送切换聊天目标的通知
       await sendMessage({
         chat_id: ADMIN_UID,
-        parse_mode: 'Markdown', // 使用Markdown格式
+        parse_mode: 'MarkdownV2', // 使用MarkdownV2格式
         text: messageText
       });
     }
