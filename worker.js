@@ -17,14 +17,18 @@ let chatTargetUpdated = false; // 标志是否更新了聊天目标
 
 // 在程序启动时加载骗子列表
 loadFraudList();
+// 在程序启动时加载会话状态
+loadChatSession();
 
-// 转义
 function escapeMarkdown(text) {
   return text.replace(/([_*[\]()~`>#+-=|{}.!])/g, '\\$1');
 }
+
+
 /**
  * Return url to telegram api, optionally with parameters added
  */
+ 
 function apiUrl(methodName, params = null) {
   let query = ''
   if (params) {
@@ -37,6 +41,8 @@ function requestTelegram(methodName, body, params = null){
   return fetch(apiUrl(methodName, params), body)
     .then(r => r.json())
 }
+
+
 
 function makeReqBody(body){
   return {
@@ -69,6 +75,17 @@ function generateKeyboard(options) {
       }])
     }
   };
+}
+
+async function saveChatSession() {
+  await FRAUD_LIST.put('chatSessions', JSON.stringify(chatSessions));
+}
+
+async function loadChatSession() {
+  const storedSessions = await FRAUD_LIST.get('chatSessions');
+  if (storedSessions) {
+    Object.assign(chatSessions, JSON.parse(storedSessions));
+  }
 }
 
 async function generateRecentChatButtons() {
@@ -424,7 +441,7 @@ async function handleGuestMessage(message) {
         }
         await sendMessage({
           chat_id: ADMIN_UID,
-          parse_mode: 'MarkdownV2', // 使用MarkdownV2格式
+          parse_mode: 'MarkdownV2', // 使用Markdown格式
           text: messageText,
           ...generateKeyboard([{ text: `选择${nickname}`, callback_data: `select_${chatId}` }])
         });
@@ -476,11 +493,32 @@ async function onCallbackQuery(callbackQuery) {
       // 发送切换聊天目标的通知
       await sendMessage({
         chat_id: ADMIN_UID,
-        parse_mode: 'MarkdownV2', // 使用MarkdownV2格式
+        parse_mode: 'MarkdownV2', // 使用Markdown格式
         text: messageText
       });
+      // 新增：更新会话状态
+      chatSessions[ADMIN_UID] = {
+        target: selectedChatId,
+        timestamp: Date.now()
+      };
+      await saveChatSession();
     }
   }
+}
+
+// 新增：获取当前聊天目标
+async function getCurrentChatTarget() {
+  const session = chatSessions[ADMIN_UID];
+  if (session) {
+    const elapsed = Date.now() - session.timestamp;
+    if (elapsed < 30 * 60 * 1000) { // 30分钟
+      return session.target;
+    } else {
+      delete chatSessions[ADMIN_UID];
+      await saveChatSession();
+    }
+  }
+  return null;
 }
 
 async function handleNotify(message) {
@@ -491,7 +529,7 @@ async function handleNotify(message) {
     return sendMessage({
       chat_id: ADMIN_UID,
       parse_mode: 'Markdown', // 使用Markdown格式
-      text: `*请注意对方是骗子*！！，UID：${chatId}`
+      text: `*请注意对方是骗子*！！ \n UID：${chatId}`
     });
   }
   if (enable_notification) {
@@ -528,7 +566,7 @@ async function handleUnBlock(message) {
   let guestChatId = await nfd.get('msg-map-' + message.reply_to_message.message_id, { type: "json" });
   const userInfo = await getUserInfo(guestChatId);
   const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${guestChatId}`;
-  await nfd.put('isblocked-' + guestChatId, false);
+  await nfd.put('is_blocked_' + guestChatId, false);
 
   return sendMessage({
     chat_id: ADMIN_UID,
