@@ -106,8 +106,8 @@ async function generateRecentChatButtons() {
 async function saveRecentChatTargets(chatId) {
   let recentChatTargets = await FRAUD_LIST.get('recentChatTargets', { type: "json" }) || [];
   // 如果聊天目标已经存在，则移到最前面
-  recentChatTargets = recentChatTargets.filter(id => id !== chatId);
-  recentChatTargets.unshift(chatId);
+  recentChatTargets = recentChatTargets.filter(id => id !== chatId.toString());
+  recentChatTargets.unshift(chatId.toString());
   // 保持最多五个聊天目标
   if (recentChatTargets.length > 5) {
     recentChatTargets.pop();
@@ -117,7 +117,7 @@ async function saveRecentChatTargets(chatId) {
 
 async function getRecentChatTargets() {
   let recentChatTargets = await FRAUD_LIST.get('recentChatTargets', { type: "json" }) || [];
-  return recentChatTargets;
+  return recentChatTargets.map(id => id.toString());
 }
 
 
@@ -211,87 +211,90 @@ async function onMessage(message) {
   // 更新最后交互时间
   session.lastInteraction = Date.now();
 
-  if (message.text === '/start') {
-    let startMsg = "欢迎使用聊天机器人";
-    await setBotCommands();
-    return sendMessage({
-      chat_id: message.chat.id,
-      text: startMsg,
-    });
-  } else if (message.text === '/help') {
-    let helpMsg = "可用指令列表:\n" +
-                  "/start - 启动机器人会话\n" +
-                  "/help - 显示此帮助信息\n" +
-                  "/block - 屏蔽用户 (仅管理员)\n" +
-                  "/unblock - 解除屏蔽用户 (仅管理员)\n" +
-                  "/checkblock - 检查用户是否被屏蔽 (仅管理员)\n" +
-                  "/fraud - 添加骗子ID (仅管理员)\n" + // 更新帮助信息
-                  "/unfraud - 移除骗子ID (仅管理员)\n" + // 更新帮助信息
-                  "/list - 查看本地骗子ID列表 (仅管理员)\n" + // 添加新命令
-                  "更多指令将在后续更新中添加。";
-    return sendMessage({
-      chat_id: message.chat.id,
-      text: helpMsg,
-    });
-  } else if (message.text === '/list' && message.chat.id.toString() === ADMIN_UID) {
-    // 处理 /list 命令
-    if (localFraudList.length === 0) {
+  if (message.text) {
+    if (message.text === '/start') {
+      let startMsg = "欢迎使用聊天机器人";
+      await setBotCommands();
       return sendMessage({
         chat_id: message.chat.id,
-        text: '本地没有骗子ID。'
+        text: startMsg,
       });
-    } else {
-      const fraudListText = await Promise.all(localFraudList.map(async uid => {
-        const userInfo = await getUserInfo(uid);
-        const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : '未知';
-        return `UID: ${uid}, 昵称: ${nickname}`;
-      }));
+    } else if (message.text === '/help') {
+      let helpMsg = "可用指令列表:\n" +
+                    "/start - 启动机器人会话\n" +
+                    "/help - 显示此帮助信息\n" +
+                    "/block - 屏蔽用户 (仅管理员)\n" +
+                    "/unblock - 解除屏蔽用户 (仅管理员)\n" +
+                    "/checkblock - 检查用户是否被屏蔽 (仅管理员)\n" +
+                    "/fraud - 添加骗子ID (仅管理员)\n" + // 更新帮助信息
+                    "/unfraud - 移除骗子ID (仅管理员)\n" + // 更新帮助信息
+                    "/list - 查看本地骗子ID列表 (仅管理员)\n" + // 添加新命令
+                    "更多指令将在后续更新中添加。";
       return sendMessage({
         chat_id: message.chat.id,
-        text: `本地骗子ID列表:\n${fraudListText.join('\n')}`
+        text: helpMsg,
       });
-    }
-  } else if (message.text.startsWith('/fraud') && message.chat.id.toString() === ADMIN_UID) {
-    const parts = message.text.split(' ');
-    if (parts.length === 2) {
-      const fraudId = parts[1].toString(); // 确保 UID 是字符串类型
-      localFraudList.push(fraudId); // 添加到本地数组
-      await saveFraudList(); // 保存更新后的列表
-      return sendMessage({
-        chat_id: message.chat.id,
-        text: `已添加骗子ID: ${fraudId}`
-      });
-    } else {
-      return sendMessage({
-        chat_id: message.chat.id,
-        text: '使用方法: /fraud <用户UID>'
-      });
-    }
-  } else if (message.text.startsWith('/unfraud') && message.chat.id.toString() === ADMIN_UID) {
-    const parts = message.text.split(' ');
-    if (parts.length === 2) {
-      const fraudId = parts[1].toString(); // 确保 UID 是字符串类型
-      const index = localFraudList.indexOf(fraudId);
-      if (index > -1) {
-        localFraudList.splice(index, 1); // 从本地数组中移除
+    } else if (message.text === '/list' && message.chat.id.toString() === ADMIN_UID) {
+      // 处理 /list 命令
+      if (localFraudList.length === 0) {
+        return sendMessage({
+          chat_id: message.chat.id,
+          text: '本地没有骗子ID。'
+        });
+      } else {
+        const fraudListText = await Promise.all(localFraudList.map(async uid => {
+          const userInfo = await getUserInfo(uid);
+          const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : '未知';
+          return `UID: ${uid}, 昵称: ${nickname}`;
+        }));
+        return sendMessage({
+          chat_id: message.chat.id,
+          text: `本地骗子ID列表:\n${fraudListText.join('\n')}`
+        });
+      }
+    } else if (message.text.startsWith('/fraud') && message.chat.id.toString() === ADMIN_UID) {
+      const parts = message.text.split(' ');
+      if (parts.length === 2) {
+        const fraudId = parts[1].toString(); // 确保 UID 是字符串类型
+        localFraudList.push(fraudId); // 添加到本地数组
         await saveFraudList(); // 保存更新后的列表
         return sendMessage({
           chat_id: message.chat.id,
-          text: `已移除骗子ID: ${fraudId}`
+          text: `已添加骗子ID: ${fraudId}`
         });
       } else {
         return sendMessage({
           chat_id: message.chat.id,
-          text: `骗子ID: ${fraudId} 不在本地列表中`
+          text: '使用方法: /fraud <用户UID>'
         });
       }
-    } else {
-      return sendMessage({
-        chat_id: message.chat.id,
-        text: '使用方法: /unfraud <用户UID>'
-      });
+    } else if (message.text.startsWith('/unfraud') && message.chat.id.toString() === ADMIN_UID) {
+      const parts = message.text.split(' ');
+      if (parts.length === 2) {
+        const fraudId = parts[1].toString(); // 确保 UID 是字符串类型
+        const index = localFraudList.indexOf(fraudId);
+        if (index > -1) {
+          localFraudList.splice(index, 1); // 从本地数组中移除
+          await saveFraudList(); // 保存更新后的列表
+          return sendMessage({
+            chat_id: message.chat.id,
+            text: `已移除骗子ID: ${fraudId}`
+          });
+        } else {
+          return sendMessage({
+            chat_id: message.chat.id,
+            text: `骗子ID: ${fraudId} 不在本地列表中`
+          });
+        }
+      } else {
+        return sendMessage({
+          chat_id: message.chat.id,
+          text: '使用方法: /unfraud <用户UID>'
+        });
+      }
     }
   }
+
 
   // 以下是管理员专用命令
   if (message.text === '/block') {
@@ -338,14 +341,14 @@ async function onMessage(message) {
             text: message.text,
           });
         } else if (message.photo || message.video || message.document || message.audio) {
-          console.log("Copying media message:", message.message_id); // 日志输出
-          // 如果消息包含媒体文件，使用 copyMessage 方法复制媒体文件
-          await copyMessage({
-            chat_id: guestChatId,
-            from_chat_id: message.chat.id,
-            message_id: message.message_id,
-          });
-        }
+            console.log("Copying media message:", message.message_id); // 日志输出
+            // 如果消息包含媒体文件，使用 copyMessage 方法复制媒体文件
+            await copyMessage({
+              chat_id: guestChatId,
+              from_chat_id: message.chat.id,
+              message_id: message.message_id,
+            });
+          }
       }
     } else {
       if (!currentChatTarget) {
@@ -362,29 +365,13 @@ async function onMessage(message) {
           chat_id: currentChatTarget,
           text: message.text,
         });
-      } else if (message.photo) {
-        await sendPhoto({
+      } else if (message.photo || message.video || message.document || message.audio) {
+        console.log("Copying media message:", message.message_id); // 日志输出
+        // 如果消息包含媒体文件，使用 copyMessage 方法复制媒体文件
+        await copyMessage({
           chat_id: currentChatTarget,
-          photo: message.photo[0].file_id,
-          caption: message.caption || ''
-        });
-      } else if (message.video) {
-        await sendVideo({
-          chat_id: currentChatTarget,
-          video: message.video.file_id,
-          caption: message.caption || ''
-        });
-      } else if (message.document) {
-        await sendDocument({
-          chat_id: currentChatTarget,
-          document: message.document.file_id,
-          caption: message.caption || ''
-        });
-      } else if (message.audio) {
-        await sendAudio({
-          chat_id: currentChatTarget,
-          audio: message.audio.file_id,
-          caption: message.caption || ''
+          from_chat_id: message.chat.id,
+          message_id: message.message_id,
         });
       }
     }
@@ -627,3 +614,4 @@ async function isFraud(id){
   let arr = db.split('\n').filter(v => v);
   return arr.includes(id);
 }
+
