@@ -15,10 +15,14 @@ let currentChatTarget = null;  // 当前聊天目标ID
 const localFraudList = []; // 本地存储骗子ID的数组
 let chatTargetUpdated = false; // 标志是否更新了聊天目标
 
+const blockedUsers = []; // 本地存储被屏蔽用户的数组
+
 // 在程序启动时加载骗子列表
 loadFraudList();
 // 在程序启动时加载会话状态
 loadChatSession();
+// 在程序启动时加载被屏蔽用户列表
+loadBlockedUsers();
 
 function escapeMarkdown(text) {
   return text.replace(/([_*[\]()~`>#+-=|{}.!])/g, '\\$1');
@@ -102,6 +106,17 @@ async function generateRecentChatButtons() {
   return generateKeyboard(buttons);
 }
 
+async function saveBlockedUsers() {
+  await FRAUD_LIST.put('blockedUsers', JSON.stringify(blockedUsers));
+}
+
+async function loadBlockedUsers() {
+  const storedList = await FRAUD_LIST.get('blockedUsers');
+  if (storedList) {
+    blockedUsers.push(...JSON.parse(storedList));
+  }
+}
+
 // 最近聊天目标函数
 async function saveRecentChatTargets(chatId) {
   let recentChatTargets = await FRAUD_LIST.get('recentChatTargets', { type: "json" }) || [];
@@ -142,8 +157,8 @@ async function setBotCommands() {
     { command: 'checkblock', description: '检查用户是否被屏蔽 (仅管理员)' },
     { command: 'fraud', description: '添加骗子ID - [本地库] (仅管理员)' },
     { command: 'unfraud', description: '移除骗子ID - [本地库] (仅管理员)' },
-    { command: 'list', description: '查看骗子ID列表 - [本地库] (仅管理员)' }
-    
+    { command: 'list', description: '查看骗子ID列表 - [本地库] (仅管理员)' },
+    { command: 'blocklist', description: '查看屏蔽用户列表 - [本地库] (仅管理员)' }
     // 在此添加更多命令
   ];
 
@@ -229,11 +244,24 @@ async function onMessage(message) {
                     "/fraud - 添加骗子ID (仅管理员)\n" + // 更新帮助信息
                     "/unfraud - 移除骗子ID (仅管理员)\n" + // 更新帮助信息
                     "/list - 查看本地骗子ID列表 (仅管理员)\n" + // 添加新命令
+                    "/blocklist - 查看被屏蔽用户列表 (仅管理员)\n" + // 添加新命令
                     "更多指令将在后续更新中添加。";
       return sendMessage({
         chat_id: message.chat.id,
         text: helpMsg,
       });
+    } else if (message.text === '/blocklist') {
+      return listBlockedUsers();
+    } else if (message.text.startsWith('/unblock ')) {
+      const index = parseInt(message.text.split(' ')[1], 10);
+      if (!isNaN(index)) {
+        return unblockByIndex(index);
+      } else {
+        return sendMessage({
+          chat_id: ADMIN_UID,
+          text: '无效的序号。'
+        });
+      }
     } else if (message.text === '/list' && message.chat.id.toString() === ADMIN_UID) {
       // 处理 /list 命令
       if (localFraudList.length === 0) {
@@ -543,6 +571,9 @@ async function handleBlock(message) {
   const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${guestChatId}`;
   await nfd.put('isblocked-' + guestChatId, true);
 
+  blockedUsers.push(guestChatId); // 添加到本地数组
+  await saveBlockedUsers(); // 保存更新后的列表
+
   return sendMessage({
     chat_id: ADMIN_UID,
     text: `用户 ${nickname} 已被屏蔽`,
@@ -554,6 +585,12 @@ async function handleUnBlock(message) {
   const userInfo = await getUserInfo(guestChatId);
   const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${guestChatId}`;
   await nfd.put('isblocked-' + guestChatId, false);
+
+  const index = blockedUsers.indexOf(guestChatId);
+  if (index > -1) {
+    blockedUsers.splice(index, 1); // 从本地数组中移除
+    await saveBlockedUsers(); // 保存更新后的列表
+  }
 
   return sendMessage({
     chat_id: ADMIN_UID,
@@ -572,6 +609,44 @@ async function checkBlock(message) {
   });
 }
 
+
+async function listBlockedUsers() {
+  if (blockedUsers.length === 0) {
+    return sendMessage({
+      chat_id: ADMIN_UID,
+      text: '没有被屏蔽的用户。'
+    });
+  } else {
+    const blockedListText = await Promise.all(blockedUsers.map(async (uid, index) => {
+      const userInfo = await getUserInfo(uid);
+      const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : '未知';
+      return `${index + 1}. UID: ${uid}, 昵称: ${nickname}`;
+    }));
+    return sendMessage({
+      chat_id: ADMIN_UID,
+      text: `被屏蔽的用户列表:\n${blockedListText.join('\n')}`
+    });
+  }
+}
+
+async function unblockByIndex(index) {
+  if (index < 1 || index > blockedUsers.length) {
+    return sendMessage({
+      chat_id: ADMIN_UID,
+      text: '无效的序号。'
+    });
+  }
+  const guestChatId = blockedUsers[index - 1];
+  await nfd.put('isblocked-' + guestChatId, false); // 确保键名一致
+  blockedUsers.splice(index - 1, 1); // 从本地数组中移除
+  await saveBlockedUsers(); // 保存更新后的列表
+  const userInfo = await getUserInfo(guestChatId);
+  const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${guestChatId}`;
+  return sendMessage({
+    chat_id: ADMIN_UID,
+    text: `用户 ${nickname} 已解除屏蔽`,
+  });
+}
 
 
 
