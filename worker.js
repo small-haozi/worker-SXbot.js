@@ -16,6 +16,7 @@ const localFraudList = []; // 本地存储骗子ID的数组
 let chatTargetUpdated = false; // 标志是否更新了聊天目标
 
 const blockedUsers = []; // 本地存储被屏蔽用户的数组
+let pendingMessage = null; // 全局变量保存待发送的消息
 
 // 在程序启动时加载骗子列表
 loadFraudList();
@@ -152,6 +153,7 @@ async function setBotCommands() {
   const commands = [
     { command: 'start', description: '启动机器人会话' },
     { command: 'help', description: '显示帮助信息' },
+    { command: 'search', description: '查看指定uid用户最新昵称' },
     { command: 'block', description: '屏蔽用户 (仅管理员)' },
     { command: 'unblock', description: '解除屏蔽用户 (仅管理员)' },
     { command: 'checkblock', description: '检查用户是否被屏蔽 (仅管理员)' },
@@ -159,6 +161,7 @@ async function setBotCommands() {
     { command: 'unfraud', description: '移除骗子ID - [本地库] (仅管理员)' },
     { command: 'list', description: '查看骗子ID列表 - [本地库] (仅管理员)' },
     { command: 'blocklist', description: '查看屏蔽用户列表 - [本地库] (仅管理员)' }
+    
     // 在此添加更多命令
   ];
 
@@ -210,6 +213,44 @@ async function getUserInfo(chatId) {
   }
 }
 
+async function getChatMember(chatId) {
+  const response = await requestTelegram('getChatMember', makeReqBody({ chat_id: chatId, user_id: chatId }));
+  console.log(`Response for getChatMember with chatId ${chatId}:`, response); // 调试信息
+  if (response.ok) {
+    return response.result;
+  } else {
+    console.error(`Failed to get chat member info for chat ID ${chatId}:`, response);
+    return null;
+  }
+}
+
+async function getUserProfilePhotos(userId) {
+  const response = await requestTelegram('getUserProfilePhotos', makeReqBody({ user_id: userId }));
+  console.log(`Response for getUserProfilePhotos with userId ${userId}:`, response); // 调试信息
+  if (response.ok) {
+    const photos = response.result.photos;
+    if (photos.length > 0) {
+      return `用户存在，头像数量: ${photos.length}`;
+    } else {
+      return '用户存在，但没有头像';
+    }
+  } else {
+    console.error(`Failed to get user profile photos for user ID ${userId}:`, response);
+    return null;
+  }
+}
+
+async function getChat(chatId) {
+  const response = await requestTelegram('getChat', makeReqBody({ chat_id: chatId }));
+  console.log(`Response for getChat with chatId ${chatId}:`, response); // 调试信息
+  if (response.ok) {
+    return response.result;
+  } else {
+    console.error(`Failed to get chat info for chat ID ${chatId}:`, response);
+    return null;
+  }
+}
+
 async function onMessage(message) {
   const chatId = message.chat.id.toString();
 
@@ -238,6 +279,7 @@ async function onMessage(message) {
       let helpMsg = "可用指令列表:\n" +
                     "/start - 启动机器人会话\n" +
                     "/help - 显示此帮助信息\n" +
+                    "/search - 通过uid查询最新名字\n" + //查看指定uid最新用户名
                     "/block - 屏蔽用户 (仅管理员)\n" +
                     "/unblock - 解除屏蔽用户 (仅管理员)\n" +
                     "/checkblock - 检查用户是否被屏蔽 (仅管理员)\n" +
@@ -271,7 +313,7 @@ async function onMessage(message) {
         });
       } else {
         const fraudListText = await Promise.all(localFraudList.map(async uid => {
-          const userInfo = await getUserInfo(uid);
+          const userInfo = await getChat(uid);
           const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : '未知';
           return `UID: ${uid}, 昵称: ${nickname}`;
         }));
@@ -280,16 +322,46 @@ async function onMessage(message) {
           text: `本地骗子ID列表:\n${fraudListText.join('\n')}`
         });
       }
+    } else if (message.text.startsWith('/search') && message.chat.id.toString() === ADMIN_UID) {
+      const parts = message.text.split(' ');
+      if (parts.length === 2) {
+        const searchId = parts[1].toString(); // 确保 UID 是字符串类型
+        const userInfo = await getChatMember(searchId);
+        if (userInfo) {
+          const nickname = `${userInfo.user.first_name} ${userInfo.user.last_name || ''}`.trim();
+          return sendMessage({
+            chat_id: message.chat.id,
+            text: `UID: ${searchId}, 昵称: ${nickname}`
+          });
+        } else {
+          return sendMessage({
+            chat_id: message.chat.id,
+            text: `无法找到 UID: ${searchId} 的用户信息`
+          });
+        }
+      } else {
+        return sendMessage({
+          chat_id: message.chat.id,
+          text: '使用方法: /search <用户UID>'
+        });
+      }
     } else if (message.text.startsWith('/fraud') && message.chat.id.toString() === ADMIN_UID) {
       const parts = message.text.split(' ');
       if (parts.length === 2) {
         const fraudId = parts[1].toString(); // 确保 UID 是字符串类型
-        localFraudList.push(fraudId); // 添加到本地数组
-        await saveFraudList(); // 保存更新后的列表
-        return sendMessage({
-          chat_id: message.chat.id,
-          text: `已添加骗子ID: ${fraudId}`
-        });
+        if (!localFraudList.includes(fraudId)) { // 检查是否已经存在
+          localFraudList.push(fraudId); // 添加到本地数组
+          await saveFraudList(); // 保存更新后的列表
+          return sendMessage({
+            chat_id: message.chat.id,
+            text: `已添加骗子ID: ${fraudId}`
+          });
+        } else {
+          return sendMessage({
+            chat_id: message.chat.id,
+            text: `骗子ID: ${fraudId} 已存在`
+          });
+        }
       } else {
         return sendMessage({
           chat_id: message.chat.id,
@@ -380,6 +452,8 @@ async function onMessage(message) {
       }
     } else {
       if (!currentChatTarget) {
+        // 保存消息内容
+        pendingMessage = message;
         const recentChatButtons = await generateRecentChatButtons();
         return sendMessage({
           chat_id: ADMIN_UID,
@@ -517,6 +591,55 @@ async function onCallbackQuery(callbackQuery) {
         timestamp: Date.now()
       };
       await saveChatSession();
+      // 发送之前保存的消息
+      // 发送之前保存的消息
+      // 发送之前保存的消息
+      if (pendingMessage) {
+        try {
+          if (pendingMessage.text) {
+            await sendMessage({
+              chat_id: currentChatTarget,
+              text: pendingMessage.text,
+            });
+          } else if (pendingMessage.photo) {
+            await copyMessage({
+              chat_id: currentChatTarget,
+              from_chat_id: ADMIN_UID,
+              message_id: pendingMessage.message_id,
+            });
+          } else if (pendingMessage.video) {
+            await copyMessage({
+              chat_id: currentChatTarget,
+              from_chat_id: ADMIN_UID,
+              message_id: pendingMessage.message_id,
+            });
+          } else if (pendingMessage.document) {
+            await copyMessage({
+              chat_id: currentChatTarget,
+              from_chat_id: ADMIN_UID,
+              message_id: pendingMessage.message_id,
+            });
+          } else if (pendingMessage.audio) {
+            await copyMessage({
+              chat_id: currentChatTarget,
+              from_chat_id: ADMIN_UID,
+              message_id: pendingMessage.message_id,
+            });
+          }
+          await sendMessage({
+            chat_id: ADMIN_UID,
+            text: "消息已成功转发给目标用户。",
+            reply_to_message_id: pendingMessage.message_id // 引用上一条消息
+          });
+        } catch (error) {
+          await sendMessage({
+            chat_id: ADMIN_UID,
+            text: "消息转发失败，请重试。",
+            reply_to_message_id: pendingMessage.message_id // 引用上一条消息
+          });
+        }
+        pendingMessage = null; // 清空待发送消息
+      }
     }
   }
 }
@@ -689,4 +812,3 @@ async function isFraud(id){
   let arr = db.split('\n').filter(v => v);
   return arr.includes(id);
 }
-
