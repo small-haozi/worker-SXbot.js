@@ -286,6 +286,18 @@ async function onMessage(message) {
       currentChatTarget = repliedChatId;
       await setCurrentChatTarget(repliedChatId); // 更新当前聊天目标
       await saveRecentChatTargets(repliedChatId); // 保存最近的聊天目标
+
+      // 获取被回复用户的信息
+      const userInfo = await getUserInfo(repliedChatId);
+      let nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${repliedChatId}`;
+      nickname = escapeMarkdown(nickname); // 转义 Markdown 特殊符号
+
+      // 发送切换聊天目标的通知
+      await sendMessage({
+        chat_id: ADMIN_UID,
+        parse_mode: 'MarkdownV2', // 使用Markdown格式
+        text: `已切换到聊天目标:【 *${nickname}* 】 \nuid：${repliedChatId}`
+      });
     }
   }
 
