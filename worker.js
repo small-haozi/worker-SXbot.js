@@ -111,6 +111,16 @@ async function saveBlockedUsers() {
   await FRAUD_LIST.put('blockedUsers', JSON.stringify(blockedUsers));
 }
 
+async function searchUserByUID(uid) {
+  const userInfo = await getUserInfo(uid);
+  if (userInfo) {
+    const nickname = `${userInfo.first_name} ${userInfo.last_name || ''}`.trim();
+    return `UID: ${uid}, 昵称: ${nickname}`;
+  } else {
+    return `无法找到 UID: ${uid} 的用户信息`;
+  }
+}
+
 async function loadBlockedUsers() {
   const storedList = await FRAUD_LIST.get('blockedUsers');
   if (storedList) {
@@ -267,6 +277,18 @@ async function onMessage(message) {
   // 更新最后交互时间
   session.lastInteraction = Date.now();
 
+  // 获取当前聊天目标
+  currentChatTarget = await getCurrentChatTarget();
+
+  if (message.reply_to_message) {
+    const repliedChatId = await nfd.get('msg-map-' + message.reply_to_message.message_id, { type: "json" });
+    if (repliedChatId) {
+      currentChatTarget = repliedChatId;
+      await setCurrentChatTarget(repliedChatId); // 更新当前聊天目标
+      await saveRecentChatTargets(repliedChatId); // 保存最近的聊天目标
+    }
+  }
+
   if (message.text) {
     if (message.text === '/start') {
       let startMsg = "欢迎使用聊天机器人";
@@ -313,7 +335,7 @@ async function onMessage(message) {
         });
       } else {
         const fraudListText = await Promise.all(localFraudList.map(async uid => {
-          const userInfo = await getChat(uid);
+          const userInfo = await searchUserByUID(uid);
           const nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : '未知';
           return `UID: ${uid}, 昵称: ${nickname}`;
         }));
@@ -326,7 +348,7 @@ async function onMessage(message) {
       const parts = message.text.split(' ');
       if (parts.length === 2) {
         const searchId = parts[1].toString(); // 确保 UID 是字符串类型
-        const userInfo = await getChatMember(searchId);
+        const userInfo = await searchUserByUID(searchId);
         if (userInfo) {
           const nickname = `${userInfo.user.first_name} ${userInfo.user.last_name || ''}`.trim();
           return sendMessage({
@@ -571,6 +593,7 @@ async function onCallbackQuery(callbackQuery) {
       currentChatTarget = selectedChatId;
       chatTargetUpdated = true; // 设置标志
       await saveRecentChatTargets(selectedChatId); // 保存最近的聊天目标
+      await setCurrentChatTarget(selectedChatId); // 更新当前聊天目标
       const userInfo = await getUserInfo(selectedChatId);
       let nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${selectedChatId}`;
       nickname = escapeMarkdown(nickname); // 转义 Markdown 特殊符号
@@ -646,17 +669,24 @@ async function onCallbackQuery(callbackQuery) {
 
 // 新增：获取当前聊天目标
 async function getCurrentChatTarget() {
-  const session = chatSessions[ADMIN_UID];
+  const session = await FRAUD_LIST.get('currentChatTarget', { type: 'json' });
   if (session) {
     const elapsed = Date.now() - session.timestamp;
     if (elapsed < 30 * 60 * 1000) { // 30分钟
       return session.target;
     } else {
-      delete chatSessions[ADMIN_UID];
-      await saveChatSession();
+      await KV_NAMESPACE.delete('currentChatTarget');
     }
   }
   return null;
+}
+
+async function setCurrentChatTarget(target) {
+  const session = {
+    target: target,
+    timestamp: Date.now()
+  };
+  await FRAUD_LIST.put('currentChatTarget', JSON.stringify(session));
 }
 
 async function handleNotify(message) {
