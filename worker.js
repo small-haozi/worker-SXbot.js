@@ -291,12 +291,13 @@ async function onMessage(message) {
       const userInfo = await getUserInfo(repliedChatId);
       let nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${repliedChatId}`;
       nickname = escapeMarkdown(nickname); // 转义 Markdown 特殊符号
+      const chatLink = userInfo.username ? `https://t.me/${userInfo.username}` : `tg://user?id=${repliedChatId}`; // 生成聊天链接
 
       // 发送切换聊天目标的通知
       await sendMessage({
         chat_id: ADMIN_UID,
         parse_mode: 'MarkdownV2', // 使用Markdown格式
-        text: `已切换到聊天目标:【 *${nickname}* 】 \nuid：${repliedChatId}`
+        text: `已切换到聊天目标:【 *${nickname}* 】 \nuid：${repliedChatId}\n[点击不用bot直接私聊](${chatLink})`
       });
     }
   }
@@ -609,7 +610,7 @@ async function onCallbackQuery(callbackQuery) {
       const userInfo = await getUserInfo(selectedChatId);
       let nickname = userInfo ? `${userInfo.first_name} ${userInfo.last_name || ''}`.trim() : `UID:${selectedChatId}`;
       nickname = escapeMarkdown(nickname); // 转义 Markdown 特殊符号
-      const chatLink = `tg://user?id=${selectedChatId}`; // 生成聊天链接
+      const chatLink = userInfo.username ? `https://t.me/${userInfo.username}` : `tg://user?id=${selectedChatId}`; // 生成聊天链接
       let messageText = `已切换到聊天目标:【 *${nickname}* 】 \nuid：${selectedChatId}\n[点击不用bot直接私聊](${chatLink})`;
       if (await isFraud(selectedChatId)) {
         messageText += `\n\n*请注意，对方是骗子!*`; // 添加警告信息
