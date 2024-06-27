@@ -688,7 +688,7 @@ async function getCurrentChatTarget() {
     if (elapsed < 30 * 60 * 1000) { // 30分钟
       return session.target;
     } else {
-      await KV_NAMESPACE.delete('currentChatTarget');
+      await FRAUD_LIST.delete('currentChatTarget'); // 删除过期的聊天目标
     }
   }
   return null;
