@@ -18,12 +18,13 @@ let chatTargetUpdated = false; // 标志是否更新了聊天目标
 const blockedUsers = []; // 本地存储被屏蔽用户的数组
 let pendingMessage = null; // 全局变量保存待发送的消息
 
-// 在程序启动时加载骗子列表
-loadFraudList();
+
 // 在程序启动时加载会话状态
 loadChatSession();
 // 在程序启动时加载被屏蔽用户列表
 loadBlockedUsers();
+// 在程序启动时加载骗子列表
+loadFraudList();
 
 function escapeMarkdown(text) {
   return text.replace(/([_*[\]()~`>#+-=|{}.!])/g, '\\$1');
@@ -341,6 +342,12 @@ async function onMessage(message) {
       }
     } else if (message.text === '/list' && message.chat.id.toString() === ADMIN_UID) {
       // 处理 /list 命令
+      const storedList = await FRAUD_LIST.get('localFraudList');
+      if (storedList) {
+        localFraudList.length = 0; // 清空当前列表，确保只包含最新数据
+        localFraudList.push(...JSON.parse(storedList));
+      }
+
       if (localFraudList.length === 0) {
         return sendMessage({
           chat_id: message.chat.id,
